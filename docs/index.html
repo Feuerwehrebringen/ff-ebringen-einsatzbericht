@@ -301,6 +301,9 @@
           throw new Error('Unerwartete Antwort vom Server. Ist die Web-App für „Jeder“ freigegeben?');
         }
         if (!res.ok) throw new Error(res.error || 'Unbekannter Fehler');
+        if (action === 'data' && (!res.data || !res.data.einsatzleiter)) {
+          throw new Error('Der Server hat unvollständige Daten geliefert.');
+        }
         return res;
       });
     }
@@ -324,6 +327,17 @@
     }
 
     /* ---------- Laden ---------- */
+    // Bei einem Aussetzer der Google-Antwort bis zu zweimal automatisch neu versuchen.
+    function fetchData(code, tries) {
+      return api('data', code).catch(function (err) {
+        if (tries > 0 && !/Zugangscode/.test(err.message)) {
+          return new Promise(function (resolve) { setTimeout(resolve, 1500); })
+            .then(function () { return fetchData(code, tries - 1); });
+        }
+        throw err;
+      });
+    }
+
     function loadData(code, fromLogin) {
       $('login').classList.add('is-hidden');
       $('loadError').classList.add('is-hidden');
@@ -337,7 +351,7 @@
         $('loading').classList.remove('is-hidden');
       }
 
-      api('data', code).then(function (res) {
+      fetchData(code, 2).then(function (res) {
         state.code = code;
         saveCode(code);
         saveData(res.data);
