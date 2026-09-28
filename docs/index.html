@@ -122,7 +122,7 @@
       </form>
     </div>
 
-    <div id="loading" class="is-hidden"><span class="icon"><i class="fas fa-spinner fa-spin"></i></span> Daten werden geladen …</div>
+    <div id="loading" class="is-hidden"><span class="icon"><i class="fas fa-spinner fa-spin"></i></span> Daten werden geladen … beim ersten Öffnen kann das bis zu 10 Sekunden dauern.</div>
     <div id="loadError" class="notification is-danger is-light is-hidden"></div>
 
     <form id="form" class="is-hidden" novalidate autocomplete="off">
@@ -263,8 +263,9 @@
 
   <script src="config.js"></script>
   <script>
-    var state = { data: null, photos: [], code: '' };
+    var state = { data: null, photos: [], code: '', shown: false, dirty: false };
     var CODE_KEY = 'ffe-einsatzbericht-code';
+    var DATA_KEY = 'ffe-einsatzbericht-daten';
     var MAX_PHOTOS = 8;
     var REQUIRED = ['einsatznummer', 'datum', 'einsatzleiter', 'alarmzeit', 'einsatzart', 'ort'];
 
@@ -307,6 +308,10 @@
     function saveCode(c) { try { localStorage.setItem(CODE_KEY, c); } catch (e) {} }
     function readCode() { try { return localStorage.getItem(CODE_KEY) || ''; } catch (e) { return ''; } }
     function clearCode() { try { localStorage.removeItem(CODE_KEY); } catch (e) {} }
+    function saveData(d) { try { localStorage.setItem(DATA_KEY, JSON.stringify(d)); } catch (e) {} }
+    function readData() {
+      try { return JSON.parse(localStorage.getItem(DATA_KEY) || 'null'); } catch (e) { return null; }
+    }
 
     function showLogin(errorText) {
       $('loading').classList.add('is-hidden');
@@ -322,23 +327,41 @@
     function loadData(code, fromLogin) {
       $('login').classList.add('is-hidden');
       $('loadError').classList.add('is-hidden');
-      $('loading').classList.remove('is-hidden');
+
+      // Zuletzt geladene Daten sofort anzeigen, die aktuellen kommen im Hintergrund nach.
+      var cached = fromLogin ? null : readData();
+      if (cached && cached.einsatzleiter) {
+        state.code = code;
+        onData(cached);
+      } else {
+        $('loading').classList.remove('is-hidden');
+      }
+
       api('data', code).then(function (res) {
         state.code = code;
         saveCode(code);
-        onData(res.data);
+        saveData(res.data);
+        // Bereits angezeigtes Formular nur austauschen, wenn noch nichts eingegeben wurde.
+        if (!state.shown || (!state.dirty && JSON.stringify(res.data) !== JSON.stringify(state.data))) {
+          onData(res.data);
+        }
       }).catch(function (err) {
         if (/Zugangscode/.test(err.message)) {
           clearCode();
           showLogin(fromLogin ? err.message : '');
           return;
         }
+        if (state.shown) return; // Formular ist schon da, die Aktualisierung im Hintergrund darf scheitern
         $('loading').classList.add('is-hidden');
         var box = $('loadError');
         box.textContent = 'Die Daten konnten nicht geladen werden: ' + err.message;
         box.classList.remove('is-hidden');
       });
     }
+
+    ['input', 'change', 'click'].forEach(function (evt) {
+      $('form').addEventListener(evt, function () { state.dirty = true; }, true);
+    });
 
     $('loginForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
@@ -377,6 +400,8 @@
       }).join('');
 
       resetForm();
+      state.dirty = false;
+      state.shown = true;
       $('loading').classList.add('is-hidden');
       $('form').classList.remove('is-hidden');
     }
