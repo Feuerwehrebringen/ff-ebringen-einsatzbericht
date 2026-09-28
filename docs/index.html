@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Einsatzbericht – FF Ebringen</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    :root {
+      --red: #d32f2f;
+      --red-dark: #b71c1c;
+      --bg: #f4f6fb;
+      --text: #2b2b2b;
+    }
+    body { background: var(--bg); color: var(--text); }
+    .page {
+      max-width: 940px;
+      margin: 1.5rem auto;
+      padding: 1.5rem;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+    }
+    .logo { display: block; max-height: 64px; margin: 0 auto .75rem; }
+    h1.title { text-align: center; margin-bottom: 1.5rem; }
+
+    .section {
+      border: 1px solid #e3e5ea;
+      border-top: 4px solid var(--red);
+      border-radius: 6px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .section-title {
+      color: var(--red);
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .section-title .icon { margin-right: .5rem; }
+    .label { color: var(--text); }
+    .input, .select select, .textarea { border-color: #d5d8de; box-shadow: none; }
+    .input:focus, .select select:focus, .textarea:focus {
+      border-color: var(--red);
+      box-shadow: 0 0 0 2px rgba(211, 47, 47, .15);
+    }
+    .is-danger, .select.is-danger select { border-color: var(--red-dark) !important; }
+
+    .vehicle {
+      display: block;
+      padding: .6rem .75rem;
+      background: #f8f8f8;
+      border: 1px solid #e3e5ea;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .vehicle input { margin-right: .5rem; }
+    .vehicles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
+
+    .crew-row {
+      display: grid;
+      grid-template-columns: 1.4fr 1.2fr 1.2fr auto auto;
+      gap: .75rem;
+      align-items: end;
+      padding: .75rem;
+      margin-bottom: .75rem;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-left: 4px solid #2f6fdb;
+      border-radius: 4px;
+    }
+    .crew-row .select, .crew-row .select select { width: 100%; }
+    .atemschutz { padding-bottom: .5rem; white-space: nowrap; }
+    .btn-add { background: #e8f0fb; color: #2f5f9e; border: none; }
+    .btn-add:hover { background: #d8e5f7; color: #2f5f9e; }
+    .btn-del { background: #fdecef; color: #c2185b; border: none; }
+
+    .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .75rem; margin-bottom: .75rem; }
+    .photo { position: relative; border: 1px solid #e3e5ea; border-radius: 6px; overflow: hidden; background: #f8f8f8; }
+    .photo img { display: block; width: 100%; height: 100px; object-fit: cover; }
+    .photo button {
+      position: absolute; top: 4px; right: 4px;
+      width: 28px; height: 28px; border: none; border-radius: 50%;
+      background: rgba(255, 255, 255, .92); color: #c2185b; cursor: pointer;
+    }
+
+    .btn-submit {
+      background: var(--red);
+      color: #fff;
+      border: none;
+      width: 100%;
+      height: 3.25rem;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+    .btn-submit:hover, .btn-submit:focus { background: var(--red-dark); color: #fff; }
+    .btn-submit[disabled] { opacity: .6; }
+
+    #loading, #loadError { text-align: center; padding: 3rem 0; }
+
+    @media (max-width: 700px) {
+      .page { margin: 0; border-radius: 0; padding: 1rem; }
+      .crew-row { grid-template-columns: 1fr 1fr; }
+      .crew-row .col-name { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <img id="logo" class="logo" src="logo.png" alt="Freiwillige Feuerwehr Ebringen">
+    <h1 class="title is-3">Einsatzbericht Erfassung</h1>
+
+    <div id="login" class="section is-hidden" style="max-width:420px;margin:1rem auto">
+      <div class="section-title"><span class="icon"><i class="fas fa-lock"></i></span>Anmeldung</div>
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label class="label" for="code">Zugangscode</label>
+          <input class="input" id="code" type="password" autocomplete="current-password">
+        </div>
+        <div id="loginError" class="notification is-danger is-light is-hidden"></div>
+        <button type="submit" class="button btn-submit" style="height:2.75rem;font-size:1rem">Anmelden</button>
+      </form>
+    </div>
+
+    <div id="loading" class="is-hidden"><span class="icon"><i class="fas fa-spinner fa-spin"></i></span> Daten werden geladen …</div>
+    <div id="loadError" class="notification is-danger is-light is-hidden"></div>
+
+    <form id="form" class="is-hidden" novalidate autocomplete="off">
+
+      <!-- Basisdaten -->
+      <section class="section">
+        <div class="section-title"><span class="icon"><i class="fas fa-clipboard-list"></i></span>Basisdaten</div>
+        <div class="columns is-multiline">
+          <div class="column is-3">
+            <div class="field"><label class="label" for="einsatznummer">Einsatznummer</label>
+              <input class="input" id="einsatznummer" type="text" maxlength="50"></div>
+          </div>
+          <div class="column is-3">
+            <div class="field"><label class="label" for="datum">Datum</label>
+              <input class="input" id="datum" type="date"></div>
+          </div>
+          <div class="column is-3">
+            <div class="field"><label class="label" for="gemarkung">Einsatz auf Gemarkung Ebringen</label>
+              <div class="select is-fullwidth"><select id="gemarkung">
+                <option value="ja">Ja</option>
+                <option value="nein">Nein (überörtliche Hilfe)</option>
+              </select></div></div>
+          </div>
+          <div class="column is-3">
+            <div class="field"><label class="label" for="einsatzleiter">Einsatzleiter</label>
+              <div class="select is-fullwidth"><select id="einsatzleiter"></select></div>
+              <p class="help is-hidden" id="leaderHelp">Entfällt bei Einsätzen außerhalb der Gemarkung.</p></div>
+          </div>
+          <div class="column is-3">
+            <div class="field"><label class="label" for="alarmzeit">Alarmzeit</label>
+              <input class="input" id="alarmzeit" type="time"></div>
+          </div>
+          <div class="column is-3">
+            <div class="field"><label class="label" for="ende">Ende</label>
+              <input class="input" id="ende" type="time"></div>
+          </div>
+          <div class="column is-3">
+            <div class="field"><label class="label" for="einsatzart">Einsatzart</label>
+              <div class="select is-fullwidth"><select id="einsatzart"></select></div></div>
+          </div>
+          <div class="column is-3">
+            <div class="field"><label class="label" for="stichwort">Stichwort</label>
+              <input class="input" id="stichwort" type="text" maxlength="100" list="stichworte">
+              <datalist id="stichworte"></datalist></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ort & Fahrzeuge -->
+      <section class="section">
+        <div class="section-title"><span class="icon"><i class="fas fa-location-dot"></i></span>Ort &amp; Fahrzeuge</div>
+        <div class="columns">
+          <div class="column is-4">
+            <div class="field"><label class="label" for="ort">Ort</label>
+              <div class="select is-fullwidth"><select id="ort"></select></div></div>
+          </div>
+          <div class="column">
+            <div class="field"><label class="label" for="strasse">Straße</label>
+              <input class="input" id="strasse" type="text" maxlength="150"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Eingesetzte Fahrzeuge (Ebringen)</label>
+          <div id="fahrzeuge" class="vehicles"></div>
+        </div>
+      </section>
+
+      <!-- Externe Behörden -->
+      <section class="section">
+        <div class="section-title"><span class="icon"><i class="fas fa-building-shield"></i></span>Externe Behörden</div>
+        <div class="columns">
+          <div class="column">
+            <div class="field"><label class="label" for="rettungsdienst">Rettungsdienst</label>
+              <textarea class="textarea" id="rettungsdienst" rows="2"></textarea></div>
+          </div>
+          <div class="column">
+            <div class="field"><label class="label" for="polizei">Polizei</label>
+              <textarea class="textarea" id="polizei" rows="2"></textarea></div>
+          </div>
+        </div>
+        <div class="columns">
+          <div class="column">
+            <div class="field"><label class="label" for="ansprechPolizei">Ansprechpartner Polizei</label>
+              <input class="input" id="ansprechPolizei" type="text" maxlength="150"></div>
+          </div>
+          <div class="column">
+            <div class="field"><label class="label" for="ansprechRD">Ansprechpartner RD</label>
+              <input class="input" id="ansprechRD" type="text" maxlength="150"></div>
+          </div>
+          <div class="column">
+            <div class="field"><label class="label" for="ansprechSonstige">Ansprechpartner Sonstige</label>
+              <input class="input" id="ansprechSonstige" type="text" maxlength="150"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Mannschaft -->
+      <section class="section">
+        <div class="section-title"><span class="icon"><i class="fas fa-users"></i></span>Mannschaft Ebringen &amp; Atemschutz</div>
+        <div id="crew"></div>
+        <button type="button" id="addCrew" class="button btn-add is-small">
+          <span class="icon is-small"><i class="fas fa-plus"></i></span><span>Kamerad hinzufügen</span>
+        </button>
+      </section>
+
+      <!-- Berichte & Lage -->
+      <section class="section">
+        <div class="section-title"><span class="icon"><i class="fas fa-pen-to-square"></i></span>Berichte &amp; Lage</div>
+        <div class="field"><label class="label" for="meldungIls">Meldung ILS</label>
+          <textarea class="textarea" id="meldungIls" rows="2"></textarea></div>
+        <div class="field"><label class="label" for="lage">Lage beim Eintreffen</label>
+          <textarea class="textarea" id="lage" rows="2"></textarea></div>
+        <div class="field"><label class="label" for="massnahmen">Maßnahmen</label>
+          <textarea class="textarea" id="massnahmen" rows="2"></textarea></div>
+        <div class="field"><label class="label" for="material">Material / Besonderheiten</label>
+          <textarea class="textarea" id="material" rows="2"></textarea></div>
+        <div class="field"><label class="label" for="kurzbericht">Kurzbericht</label>
+          <textarea class="textarea" id="kurzbericht" rows="3"></textarea></div>
+      </section>
+
+      <!-- Bilder -->
+      <section class="section">
+        <div class="section-title"><span class="icon"><i class="fas fa-camera"></i></span>Bilder</div>
+        <div id="photos" class="photos"></div>
+        <input type="file" id="photoInput" accept="image/*" multiple class="is-hidden">
+        <button type="button" id="addPhoto" class="button btn-add is-small">
+          <span class="icon is-small"><i class="fas fa-plus"></i></span><span>Bilder hinzufügen</span>
+        </button>
+        <span id="photoCount" class="help"></span>
+      </section>
+
+      <div id="msg" class="notification is-hidden" role="alert"></div>
+
+      <button type="submit" id="submitBtn" class="button btn-submit">Bericht als PDF absenden</button>
+      <p class="has-text-centered mt-4"><a href="#" id="logout" class="is-size-7">Abmelden</a></p>
+    </form>
+  </main>
+
+  <script src="config.js"></script>
+  <script>
+    var state = { data: null, photos: [], code: '' };
+    var CODE_KEY = 'ffe-einsatzbericht-code';
+    var MAX_PHOTOS = 8;
+    var REQUIRED = ['einsatznummer', 'datum', 'einsatzleiter', 'alarmzeit', 'einsatzart', 'ort'];
+
+    function $(id) { return document.getElementById(id); }
+
+    function esc(v) {
+      return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function optionsHtml(list, placeholder) {
+      return '<option value="">' + esc(placeholder) + '</option>' +
+        list.map(function (v) { return '<option value="' + esc(v) + '">' + esc(v) + '</option>'; }).join('');
+    }
+
+    function todayIso() {
+      return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    }
+
+    /* ---------- Backend-API (Google Apps Script) ---------- */
+    function api(action, code, extra) {
+      var body = Object.assign({ action: action, code: code }, extra || {});
+      return fetch((window.APP_CONFIG || {}).API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        return r.text();
+      }, function () {
+        throw new Error('Server nicht erreichbar. Bitte Internetverbindung prüfen.');
+      }).then(function (text) {
+        var res;
+        try { res = JSON.parse(text); } catch (e) {
+          throw new Error('Unerwartete Antwort vom Server. Ist die Web-App für „Jeder“ freigegeben?');
+        }
+        if (!res.ok) throw new Error(res.error || 'Unbekannter Fehler');
+        return res;
+      });
+    }
+
+    function saveCode(c) { try { localStorage.setItem(CODE_KEY, c); } catch (e) {} }
+    function readCode() { try { return localStorage.getItem(CODE_KEY) || ''; } catch (e) { return ''; } }
+    function clearCode() { try { localStorage.removeItem(CODE_KEY); } catch (e) {} }
+
+    function showLogin(errorText) {
+      $('loading').classList.add('is-hidden');
+      $('form').classList.add('is-hidden');
+      $('login').classList.remove('is-hidden');
+      var box = $('loginError');
+      box.textContent = errorText || '';
+      box.classList.toggle('is-hidden', !errorText);
+      $('code').focus();
+    }
+
+    /* ---------- Laden ---------- */
+    function loadData(code, fromLogin) {
+      $('login').classList.add('is-hidden');
+      $('loadError').classList.add('is-hidden');
+      $('loading').classList.remove('is-hidden');
+      api('data', code).then(function (res) {
+        state.code = code;
+        saveCode(code);
+        onData(res.data);
+      }).catch(function (err) {
+        if (/Zugangscode/.test(err.message)) {
+          clearCode();
+          showLogin(fromLogin ? err.message : '');
+          return;
+        }
+        $('loading').classList.add('is-hidden');
+        var box = $('loadError');
+        box.textContent = 'Die Daten konnten nicht geladen werden: ' + err.message;
+        box.classList.remove('is-hidden');
+      });
+    }
+
+    $('loginForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var c = $('code').value.trim();
+      if (c) loadData(c, true);
+    });
+
+    $('logout').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      clearCode();
+      location.reload();
+    });
+
+    (function init() {
+      var url = (window.APP_CONFIG || {}).API_URL || '';
+      if (!/^https:\/\/script\.google\.com\//.test(url)) {
+        var box = $('loadError');
+        box.textContent = 'Die Web-App-URL fehlt. Bitte in config.js den Wert API_URL eintragen.';
+        box.classList.remove('is-hidden');
+        return;
+      }
+      var saved = readCode();
+      if (saved) loadData(saved, false); else showLogin('');
+    })();
+
+    function onData(d) {
+      state.data = d;
+      $('einsatzleiter').innerHTML = optionsHtml(d.einsatzleiter, 'Bitte wählen…');
+      $('einsatzart').innerHTML = optionsHtml(d.einsatzarten, 'Bitte wählen…');
+      $('ort').innerHTML = optionsHtml(d.orte, 'Bitte wählen…');
+      $('stichworte').innerHTML = d.stichworte.map(function (s) { return '<option value="' + esc(s) + '">'; }).join('');
+
+      $('fahrzeuge').innerHTML = d.fahrzeuge.map(function (f) {
+        return '<label class="vehicle"><input type="checkbox" name="fahrzeug" value="' + esc(f) + '">' + esc(f) + '</label>';
+      }).join('');
+
+      resetForm();
+      $('loading').classList.add('is-hidden');
+      $('form').classList.remove('is-hidden');
+    }
+
+    /* ---------- Gemarkung / Einsatzleiter ---------- */
+    function isLocal() { return $('gemarkung').value === 'ja'; }
+
+    function updateLeader() {
+      var sel = $('einsatzleiter');
+      var local = isLocal();
+      sel.disabled = !local;
+      if (!local) {
+        sel.value = '';
+        sel.parentNode.classList.remove('is-danger');
+      }
+      $('leaderHelp').classList.toggle('is-hidden', local);
+    }
+
+    $('gemarkung').addEventListener('change', updateLeader);
+
+    function resetForm() {
+      $('form').reset();
+      updateLeader();
+      $('datum').value = todayIso();
+      $('crew').innerHTML = '';
+      addCrewRow();
+      state.photos = [];
+      renderPhotos();
+      clearErrors();
+    }
+
+    /* ---------- Bilder ---------- */
+    function resizeImage(file) {
+      return new Promise(function (resolve, reject) {
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          var scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+          var c = document.createElement('canvas');
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          resolve(c.toDataURL('image/jpeg', 0.75));
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error(file.name)); };
+        img.src = url;
+      });
+    }
+
+    function renderPhotos() {
+      $('photos').innerHTML = state.photos.map(function (uri, i) {
+        return '<div class="photo"><img src="' + uri + '" alt="Bild ' + (i + 1) + '">' +
+          '<button type="button" data-i="' + i + '" title="Bild entfernen" aria-label="Bild entfernen"><i class="fas fa-xmark"></i></button></div>';
+      }).join('');
+      $('photoCount').textContent = state.photos.length + ' von ' + MAX_PHOTOS + ' Bildern';
+      $('addPhoto').disabled = state.photos.length >= MAX_PHOTOS;
+    }
+
+    $('addPhoto').addEventListener('click', function () { $('photoInput').click(); });
+
+    $('photos').addEventListener('click', function (ev) {
+      var btn = ev.target.closest('button[data-i]');
+      if (!btn) return;
+      state.photos.splice(parseInt(btn.getAttribute('data-i'), 10), 1);
+      renderPhotos();
+    });
+
+    $('photoInput').addEventListener('change', function (ev) {
+      var files = Array.prototype.slice.call(ev.target.files);
+      ev.target.value = '';
+      var free = MAX_PHOTOS - state.photos.length;
+      var use = files.slice(0, free);
+      Promise.all(use.map(resizeImage)).then(function (uris) {
+        uris.forEach(function (u) { state.photos.push(u); });
+        renderPhotos();
+        if (files.length > free) showMsg('warning', 'Es sind maximal ' + MAX_PHOTOS + ' Bilder möglich, die übrigen wurden nicht übernommen.');
+      }).catch(function (err) {
+        showMsg('danger', 'Ein Bild konnte nicht gelesen werden: ' + (err && err.message ? err.message : err));
+      });
+    });
+
+    /* ---------- Mannschaft ---------- */
+    function addCrewRow() {
+      var d = state.data;
+      var row = document.createElement('div');
+      row.className = 'crew-row';
+      row.innerHTML =
+        '<div class="col-name"><label class="label">Name</label><div class="select"><select class="c-name">' + optionsHtml(d.kameraden, 'Wählen…') + '</select></div></div>' +
+        '<div><label class="label">Funktion</label><div class="select"><select class="c-funktion">' + optionsHtml(d.funktionen, 'Wählen…') + '</select></div></div>' +
+        '<div><label class="label">Fahrzeug</label><div class="select"><select class="c-fahrzeug">' + optionsHtml(d.fahrzeuge, 'Wählen…') + '</select></div></div>' +
+        '<div class="atemschutz"><label class="label">Atemschutz</label><label class="checkbox"><input type="checkbox" class="c-atemschutz"> Ja</label></div>' +
+        '<div><button type="button" class="button btn-del c-del" title="Kamerad entfernen" aria-label="Kamerad entfernen"><span class="icon"><i class="fas fa-trash"></i></span></button></div>';
+      row.querySelector('.c-del').addEventListener('click', function () {
+        row.remove();
+        if (!$('crew').children.length) addCrewRow();
+      });
+      $('crew').appendChild(row);
+    }
+
+    $('addCrew').addEventListener('click', addCrewRow);
+
+    /* ---------- Absenden ---------- */
+    function collect() {
+      var p = {};
+      ['einsatznummer', 'datum', 'gemarkung', 'einsatzleiter', 'alarmzeit', 'ende', 'einsatzart', 'stichwort', 'ort', 'strasse',
+        'rettungsdienst', 'polizei', 'ansprechPolizei', 'ansprechRD', 'ansprechSonstige',
+        'meldungIls', 'lage', 'massnahmen', 'material', 'kurzbericht'
+      ].forEach(function (id) { p[id] = $(id).value.trim(); });
+
+      p.bilder = state.photos.slice();
+
+      p.fahrzeuge = Array.prototype.map.call(
+        document.querySelectorAll('input[name="fahrzeug"]:checked'), function (c) { return c.value; });
+
+      p.mannschaft = Array.prototype.map.call(document.querySelectorAll('.crew-row'), function (row) {
+        return {
+          name: row.querySelector('.c-name').value,
+          funktion: row.querySelector('.c-funktion').value,
+          fahrzeug: row.querySelector('.c-fahrzeug').value,
+          atemschutz: row.querySelector('.c-atemschutz').checked
+        };
+      }).filter(function (m) { return m.name; });
+
+      return p;
+    }
+
+    function validate(p) {
+      var errors = [];
+      REQUIRED.forEach(function (id) {
+        if (id === 'einsatzleiter' && p.gemarkung === 'nein') return;
+        if (!p[id]) {
+          var el = $(id);
+          (el.tagName === 'SELECT' ? el.parentNode : el).classList.add('is-danger');
+          errors.push(el.closest('.field').querySelector('.label').textContent);
+        }
+      });
+      if (!p.mannschaft.length) errors.push('mindestens ein Kamerad');
+
+      var names = p.mannschaft.map(function (m) { return m.name; });
+      var dupes = names.filter(function (n, i) { return names.indexOf(n) !== i; });
+      if (dupes.length) errors.push('Kamerad doppelt eingetragen: ' + dupes.filter(function (n, i) { return dupes.indexOf(n) === i; }).join(', '));
+
+      if (p.ende && p.alarmzeit && p.ende < p.alarmzeit) {
+        // Einsatz über Mitternacht ist erlaubt – nur Hinweis, kein Fehler.
+      }
+      return errors;
+    }
+
+    function clearErrors() {
+      Array.prototype.forEach.call(document.querySelectorAll('.is-danger'), function (el) {
+        if (el.id !== 'msg' && el.id !== 'loadError') el.classList.remove('is-danger');
+      });
+      var msg = $('msg');
+      msg.className = 'notification is-hidden';
+      msg.textContent = '';
+    }
+
+    function showMsg(kind, text) {
+      var msg = $('msg');
+      msg.className = 'notification is-light is-' + kind;
+      msg.textContent = text;
+      msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function setSending(on) {
+      var b = $('submitBtn');
+      b.disabled = on;
+      b.textContent = on ? 'Bericht wird gesendet …' : 'Bericht als PDF absenden';
+    }
+
+    $('form').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      clearErrors();
+      var p = collect();
+      var errors = validate(p);
+      if (errors.length) {
+        showMsg('danger', 'Bitte ergänzen: ' + errors.join(', '));
+        return;
+      }
+      setSending(true);
+      api('submit', state.code, { report: p })
+        .then(function (res) {
+          setSending(false);
+          resetForm();
+          showMsg(res.warning ? 'warning' : 'success',
+            'Bericht gesendet (' + res.filename + ').' + (res.warning ? ' ' + res.warning : ''));
+        })
+        .catch(function (err) {
+          setSending(false);
+          showMsg('danger', 'Senden fehlgeschlagen: ' + err.message +
+            ' Deine Eingaben sind noch vorhanden – bitte erneut versuchen.');
+        });
+    });
+
+    // Fehlermarkierung beim Tippen entfernen
+    document.addEventListener('input', function (ev) {
+      var el = ev.target;
+      (el.tagName === 'SELECT' ? el.parentNode : el).classList.remove('is-danger');
+    });
+  </script>
+</body>
+</html>
