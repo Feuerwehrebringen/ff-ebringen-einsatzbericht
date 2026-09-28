@@ -190,6 +190,25 @@
         </div>
       </section>
 
+      <!-- Eigentümer / Verursacher -->
+      <section class="section">
+        <div class="section-title"><span class="icon"><i class="fas fa-user"></i></span>Eigentümer / Verursacher</div>
+        <div class="columns">
+          <div class="column">
+            <div class="field"><label class="label" for="eigentuemerName">Name</label>
+              <input class="input" id="eigentuemerName" type="text" maxlength="150"></div>
+          </div>
+          <div class="column">
+            <div class="field"><label class="label" for="eigentuemerAdresse">Adresse</label>
+              <input class="input" id="eigentuemerAdresse" type="text" maxlength="200"></div>
+          </div>
+          <div class="column is-3">
+            <div class="field"><label class="label" for="eigentuemerTelefon">Telefonnummer</label>
+              <input class="input" id="eigentuemerTelefon" type="tel" maxlength="50"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- Externe Behörden -->
       <section class="section">
         <div class="section-title"><span class="icon"><i class="fas fa-building-shield"></i></span>Externe Behörden</div>
@@ -525,6 +544,7 @@
     function collect() {
       var p = {};
       ['einsatznummer', 'datum', 'gemarkung', 'einsatzleiter', 'alarmzeit', 'ende', 'einsatzart', 'stichwort', 'ort', 'strasse',
+        'eigentuemerName', 'eigentuemerAdresse', 'eigentuemerTelefon',
         'rettungsdienst', 'polizei', 'ansprechPolizei', 'ansprechRD', 'ansprechSonstige',
         'meldungIls', 'lage', 'massnahmen', 'material', 'kurzbericht'
       ].forEach(function (id) { p[id] = $(id).value.trim(); });
