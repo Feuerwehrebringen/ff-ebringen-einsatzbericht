@@ -361,7 +361,8 @@
         return;
       }
       var saved = readCode();
-      if (saved) loadData(saved, false); else showLogin('');
+      // Ohne gesetzten Zugangscode im Backend lädt das Formular sofort, sonst erscheint die Anmeldung.
+      loadData(saved, false);
     })();
 
     function onData(d) {
