@@ -188,6 +188,11 @@
           <label class="label">Eingesetzte Fahrzeuge (Ebringen)</label>
           <div id="fahrzeuge" class="vehicles"></div>
         </div>
+        <div class="field">
+          <label class="label">Fahrzeuge anderer Feuerwehren</label>
+          <div id="fahrzeugeAndere" class="vehicles"></div>
+          <p class="help" id="fahrzeugeAndereHelp"></p>
+        </div>
       </section>
 
       <!-- Eigentümer / Verursacher -->
@@ -432,6 +437,14 @@
         return '<label class="vehicle"><input type="checkbox" name="fahrzeug" value="' + esc(f) + '">' + esc(f) + '</label>';
       }).join('');
 
+      var andere = d.fahrzeugeAndere || [];
+      $('fahrzeugeAndere').innerHTML = andere.map(function (f) {
+        return '<label class="vehicle"><input type="checkbox" name="fahrzeugAndere" value="' + esc(f) + '">' + esc(f) + '</label>';
+      }).join('');
+      $('fahrzeugeAndereHelp').textContent = andere.length
+        ? ''
+        : 'Keine Einträge. Im Blatt „Einstellungen“ unter „Fahrzeuge andere Feuerwehren“ ergänzen.';
+
       resetForm();
       state.dirty = false;
       state.shown = true;
@@ -553,6 +566,8 @@
 
       p.fahrzeuge = Array.prototype.map.call(
         document.querySelectorAll('input[name="fahrzeug"]:checked'), function (c) { return c.value; });
+      p.fahrzeugeAndere = Array.prototype.map.call(
+        document.querySelectorAll('input[name="fahrzeugAndere"]:checked'), function (c) { return c.value; });
 
       p.mannschaft = Array.prototype.map.call(document.querySelectorAll('.crew-row'), function (row) {
         return {
