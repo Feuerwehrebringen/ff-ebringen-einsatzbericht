@@ -205,6 +205,9 @@
           <label class="label">Fahrzeuge anderer Feuerwehren</label>
           <div class="picker-row">
             <div class="select is-fullwidth"><select id="fahrzeugAndereSelect"></select></div>
+          </div>
+          <div class="picker-row">
+            <input class="input" id="fahrzeugAndereInput" type="text" maxlength="100" placeholder="oder neu eintragen, z. B. „FF Wittnau MTW“">
             <button type="button" id="fahrzeugAndereAdd" class="button btn-add">
               <span class="icon is-small"><i class="fas fa-plus"></i></span><span>Hinzufügen</span>
             </button>
@@ -238,8 +241,20 @@
         <div class="section-title"><span class="icon"><i class="fas fa-building-shield"></i></span>Externe Behörden</div>
         <div class="columns">
           <div class="column">
-            <div class="field"><label class="label" for="rettungsdienst">Rettungsdienst</label>
-              <textarea class="textarea" id="rettungsdienst" rows="2"></textarea></div>
+            <div class="field">
+              <label class="label">Rettungsdienst</label>
+              <div class="picker-row">
+                <div class="select is-fullwidth"><select id="rettungsdienstSelect"></select></div>
+              </div>
+              <div class="picker-row">
+                <input class="input" id="rettungsdienstInput" type="text" maxlength="100" placeholder="oder neu eintragen">
+                <button type="button" id="rettungsdienstAdd" class="button btn-add">
+                  <span class="icon is-small"><i class="fas fa-plus"></i></span><span>Hinzufügen</span>
+                </button>
+              </div>
+              <div id="rettungsdienstChips" class="chips"></div>
+              <p class="help" id="rettungsdienstHelp"></p>
+            </div>
           </div>
           <div class="column">
             <div class="field"><label class="label" for="polizei">Polizei</label>
@@ -306,7 +321,7 @@
 
   <script src="config.js"></script>
   <script>
-    var state = { data: null, photos: [], code: '', shown: false, dirty: false, fahrzeugeAndere: [] };
+    var state = { data: null, photos: [], code: '', shown: false, dirty: false, fahrzeugeAndere: [], rettungsdienst: [] };
     var CODE_KEY = 'ffe-einsatzbericht-code';
     var DATA_KEY = 'ffe-einsatzbericht-daten';
     var MAX_PHOTOS = 8;
@@ -456,11 +471,8 @@
         return '<label class="vehicle"><input type="checkbox" name="fahrzeug" value="' + esc(f) + '">' + esc(f) + '</label>';
       }).join('');
 
-      $('fahrzeugAndereSelect').innerHTML = optionsHtml(d.fahrzeugeAndere || [], 'Fahrzeug wählen…');
-      $('fahrzeugAndereAdd').disabled = !(d.fahrzeugeAndere || []).length;
-      $('fahrzeugeAndereHelp').textContent = (d.fahrzeugeAndere || []).length
-        ? ''
-        : 'Keine Einträge. Im Blatt „Einstellungen“ unter „Fahrzeuge andere Feuerwehren“ ergänzen.';
+      fahrzeugAnderePicker.setOptions(d.fahrzeugeAndere || []);
+      rettungsdienstPicker.setOptions(d.rettungsdienst || []);
 
       resetForm();
       state.dirty = false;
@@ -493,8 +505,8 @@
       addCrewRow();
       state.photos = [];
       renderPhotos();
-      state.fahrzeugeAndere = [];
-      renderFahrzeugeAndere();
+      fahrzeugAnderePicker.reset();
+      rettungsdienstPicker.reset();
       clearErrors();
     }
 
@@ -572,28 +584,57 @@
 
     $('addCrew').addEventListener('click', addCrewRow);
 
-    /* ---------- Fahrzeuge anderer Feuerwehren ---------- */
-    function renderFahrzeugeAndere() {
-      $('fahrzeugeAndereChips').innerHTML = state.fahrzeugeAndere.map(function (f, i) {
-        return '<span class="chip">' + esc(f) +
-          '<button type="button" data-i="' + i + '" title="Entfernen" aria-label="Entfernen"><i class="fas fa-xmark"></i></button></span>';
-      }).join('');
+    /* ---------- Mehrfachauswahl mit freier Eingabe (Fahrzeuge andere Feuerwehren, Rettungsdienst) ---------- */
+    function createPicker(cfg) {
+      function render() {
+        $(cfg.chipsId).innerHTML = state[cfg.key].map(function (v, i) {
+          return '<span class="chip">' + esc(v) +
+            '<button type="button" data-i="' + i + '" title="Entfernen" aria-label="Entfernen"><i class="fas fa-xmark"></i></button></span>';
+        }).join('');
+      }
+      function add(value) {
+        value = String(value || '').trim();
+        if (!value) return;
+        var exists = state[cfg.key].some(function (v) { return v.toLowerCase() === value.toLowerCase(); });
+        if (exists) return;
+        state[cfg.key].push(value);
+        render();
+      }
+      $(cfg.selectId).addEventListener('change', function () {
+        if (this.value) { add(this.value); this.value = ''; }
+      });
+      $(cfg.addId).addEventListener('click', function () {
+        add($(cfg.inputId).value);
+        $(cfg.inputId).value = '';
+      });
+      $(cfg.inputId).addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); $(cfg.addId).click(); }
+      });
+      $(cfg.chipsId).addEventListener('click', function (ev) {
+        var btn = ev.target.closest('button[data-i]');
+        if (!btn) return;
+        state[cfg.key].splice(parseInt(btn.getAttribute('data-i'), 10), 1);
+        render();
+      });
+      return {
+        setOptions: function (list) {
+          $(cfg.selectId).innerHTML = optionsHtml(list, 'Aus Liste wählen…');
+          $(cfg.helpId).textContent = list.length ? '' : 'Noch keine Einträge in der Liste – einfach unten eintippen und hinzufügen.';
+        },
+        reset: function () { state[cfg.key] = []; render(); }
+      };
     }
 
-    $('fahrzeugAndereAdd').addEventListener('click', function () {
-      var sel = $('fahrzeugAndereSelect');
-      var v = sel.value;
-      if (!v || state.fahrzeugeAndere.indexOf(v) !== -1) return;
-      state.fahrzeugeAndere.push(v);
-      renderFahrzeugeAndere();
-      sel.value = '';
+    var fahrzeugAnderePicker = createPicker({
+      key: 'fahrzeugeAndere',
+      selectId: 'fahrzeugAndereSelect', inputId: 'fahrzeugAndereInput',
+      addId: 'fahrzeugAndereAdd', chipsId: 'fahrzeugeAndereChips', helpId: 'fahrzeugeAndereHelp'
     });
 
-    $('fahrzeugeAndereChips').addEventListener('click', function (ev) {
-      var btn = ev.target.closest('button[data-i]');
-      if (!btn) return;
-      state.fahrzeugeAndere.splice(parseInt(btn.getAttribute('data-i'), 10), 1);
-      renderFahrzeugeAndere();
+    var rettungsdienstPicker = createPicker({
+      key: 'rettungsdienst',
+      selectId: 'rettungsdienstSelect', inputId: 'rettungsdienstInput',
+      addId: 'rettungsdienstAdd', chipsId: 'rettungsdienstChips', helpId: 'rettungsdienstHelp'
     });
 
     /* ---------- Absenden ---------- */
@@ -601,7 +642,7 @@
       var p = {};
       ['einsatznummer', 'datum', 'gemarkung', 'einsatzleiter', 'alarmzeit', 'ende', 'einsatzart', 'stichwort', 'ort', 'strasse',
         'eigentuemerName', 'eigentuemerAdresse', 'eigentuemerTelefon',
-        'rettungsdienst', 'polizei', 'ansprechPolizei', 'ansprechRD', 'ansprechSonstige',
+        'polizei', 'ansprechPolizei', 'ansprechRD', 'ansprechSonstige',
         'meldungIls', 'lage', 'massnahmen', 'material', 'kurzbericht'
       ].forEach(function (id) { p[id] = $(id).value.trim(); });
 
@@ -610,6 +651,7 @@
       p.fahrzeuge = Array.prototype.map.call(
         document.querySelectorAll('input[name="fahrzeug"]:checked'), function (c) { return c.value; });
       p.fahrzeugeAndere = state.fahrzeugeAndere.slice();
+      p.rettungsdienst = state.rettungsdienst.slice();
 
       p.mannschaft = Array.prototype.map.call(document.querySelectorAll('.crew-row'), function (row) {
         return {
