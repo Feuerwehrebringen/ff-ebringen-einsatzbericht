@@ -342,6 +342,60 @@
       return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     }
 
+    /* ---------- Mehrfachauswahl mit freier Eingabe (Fahrzeuge andere Feuerwehren, Rettungsdienst) ---------- */
+    function createPicker(cfg) {
+      function render() {
+        $(cfg.chipsId).innerHTML = state[cfg.key].map(function (v, i) {
+          return '<span class="chip">' + esc(v) +
+            '<button type="button" data-i="' + i + '" title="Entfernen" aria-label="Entfernen"><i class="fas fa-xmark"></i></button></span>';
+        }).join('');
+      }
+      function add(value) {
+        value = String(value || '').trim();
+        if (!value) return;
+        var exists = state[cfg.key].some(function (v) { return v.toLowerCase() === value.toLowerCase(); });
+        if (exists) return;
+        state[cfg.key].push(value);
+        render();
+      }
+      $(cfg.selectId).addEventListener('change', function () {
+        if (this.value) { add(this.value); this.value = ''; }
+      });
+      $(cfg.addId).addEventListener('click', function () {
+        add($(cfg.inputId).value);
+        $(cfg.inputId).value = '';
+      });
+      $(cfg.inputId).addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); $(cfg.addId).click(); }
+      });
+      $(cfg.chipsId).addEventListener('click', function (ev) {
+        var btn = ev.target.closest('button[data-i]');
+        if (!btn) return;
+        state[cfg.key].splice(parseInt(btn.getAttribute('data-i'), 10), 1);
+        render();
+      });
+      return {
+        setOptions: function (list) {
+          $(cfg.selectId).innerHTML = optionsHtml(list, 'Aus Liste wählen…');
+          $(cfg.helpId).textContent = list.length ? '' : 'Noch keine Einträge in der Liste – einfach unten eintippen und hinzufügen.';
+        },
+        reset: function () { state[cfg.key] = []; render(); }
+      };
+    }
+
+    var fahrzeugAnderePicker = createPicker({
+      key: 'fahrzeugeAndere',
+      selectId: 'fahrzeugAndereSelect', inputId: 'fahrzeugAndereInput',
+      addId: 'fahrzeugAndereAdd', chipsId: 'fahrzeugeAndereChips', helpId: 'fahrzeugeAndereHelp'
+    });
+
+    var rettungsdienstPicker = createPicker({
+      key: 'rettungsdienst',
+      selectId: 'rettungsdienstSelect', inputId: 'rettungsdienstInput',
+      addId: 'rettungsdienstAdd', chipsId: 'rettungsdienstChips', helpId: 'rettungsdienstHelp'
+    });
+
+
     /* ---------- Backend-API (Google Apps Script) ---------- */
     function api(action, code, extra) {
       var body = Object.assign({ action: action, code: code }, extra || {});
@@ -402,10 +456,17 @@
 
       // Zuletzt geladene Daten sofort anzeigen, die aktuellen kommen im Hintergrund nach.
       var cached = fromLogin ? null : readData();
+      var showedCached = false;
       if (cached && cached.einsatzleiter) {
-        state.code = code;
-        onData(cached);
-      } else {
+        try {
+          state.code = code;
+          onData(cached);
+          showedCached = true;
+        } catch (err) {
+          console.error('Zwischengespeicherte Daten konnten nicht angezeigt werden: ' + err);
+        }
+      }
+      if (!showedCached) {
         $('loading').classList.remove('is-hidden');
       }
 
@@ -583,59 +644,6 @@
     }
 
     $('addCrew').addEventListener('click', addCrewRow);
-
-    /* ---------- Mehrfachauswahl mit freier Eingabe (Fahrzeuge andere Feuerwehren, Rettungsdienst) ---------- */
-    function createPicker(cfg) {
-      function render() {
-        $(cfg.chipsId).innerHTML = state[cfg.key].map(function (v, i) {
-          return '<span class="chip">' + esc(v) +
-            '<button type="button" data-i="' + i + '" title="Entfernen" aria-label="Entfernen"><i class="fas fa-xmark"></i></button></span>';
-        }).join('');
-      }
-      function add(value) {
-        value = String(value || '').trim();
-        if (!value) return;
-        var exists = state[cfg.key].some(function (v) { return v.toLowerCase() === value.toLowerCase(); });
-        if (exists) return;
-        state[cfg.key].push(value);
-        render();
-      }
-      $(cfg.selectId).addEventListener('change', function () {
-        if (this.value) { add(this.value); this.value = ''; }
-      });
-      $(cfg.addId).addEventListener('click', function () {
-        add($(cfg.inputId).value);
-        $(cfg.inputId).value = '';
-      });
-      $(cfg.inputId).addEventListener('keydown', function (ev) {
-        if (ev.key === 'Enter') { ev.preventDefault(); $(cfg.addId).click(); }
-      });
-      $(cfg.chipsId).addEventListener('click', function (ev) {
-        var btn = ev.target.closest('button[data-i]');
-        if (!btn) return;
-        state[cfg.key].splice(parseInt(btn.getAttribute('data-i'), 10), 1);
-        render();
-      });
-      return {
-        setOptions: function (list) {
-          $(cfg.selectId).innerHTML = optionsHtml(list, 'Aus Liste wählen…');
-          $(cfg.helpId).textContent = list.length ? '' : 'Noch keine Einträge in der Liste – einfach unten eintippen und hinzufügen.';
-        },
-        reset: function () { state[cfg.key] = []; render(); }
-      };
-    }
-
-    var fahrzeugAnderePicker = createPicker({
-      key: 'fahrzeugeAndere',
-      selectId: 'fahrzeugAndereSelect', inputId: 'fahrzeugAndereInput',
-      addId: 'fahrzeugAndereAdd', chipsId: 'fahrzeugeAndereChips', helpId: 'fahrzeugeAndereHelp'
-    });
-
-    var rettungsdienstPicker = createPicker({
-      key: 'rettungsdienst',
-      selectId: 'rettungsdienstSelect', inputId: 'rettungsdienstInput',
-      addId: 'rettungsdienstAdd', chipsId: 'rettungsdienstChips', helpId: 'rettungsdienstHelp'
-    });
 
     /* ---------- Absenden ---------- */
     function collect() {
