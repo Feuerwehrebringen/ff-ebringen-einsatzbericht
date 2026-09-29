@@ -57,6 +57,19 @@
     .vehicle input { margin-right: .5rem; }
     .vehicles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
 
+    .picker-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+    .picker-row .select { flex: 1; }
+    .chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .chip {
+      display: inline-flex; align-items: center; gap: .5rem;
+      background: #f8f8f8; border: 1px solid #e3e5ea; border-radius: 999px;
+      padding: .35rem .5rem .35rem .85rem; font-size: .9rem;
+    }
+    .chip button {
+      border: none; background: #ececec; color: #555; border-radius: 50%;
+      width: 20px; height: 20px; line-height: 1; cursor: pointer; font-size: .8rem;
+    }
+
     .crew-row {
       display: grid;
       grid-template-columns: 1.4fr 1.2fr 1.2fr auto auto;
@@ -190,7 +203,13 @@
         </div>
         <div class="field">
           <label class="label">Fahrzeuge anderer Feuerwehren</label>
-          <div id="fahrzeugeAndere" class="vehicles"></div>
+          <div class="picker-row">
+            <div class="select is-fullwidth"><select id="fahrzeugAndereSelect"></select></div>
+            <button type="button" id="fahrzeugAndereAdd" class="button btn-add">
+              <span class="icon is-small"><i class="fas fa-plus"></i></span><span>Hinzufügen</span>
+            </button>
+          </div>
+          <div id="fahrzeugeAndereChips" class="chips"></div>
           <p class="help" id="fahrzeugeAndereHelp"></p>
         </div>
       </section>
@@ -287,7 +306,7 @@
 
   <script src="config.js"></script>
   <script>
-    var state = { data: null, photos: [], code: '', shown: false, dirty: false };
+    var state = { data: null, photos: [], code: '', shown: false, dirty: false, fahrzeugeAndere: [] };
     var CODE_KEY = 'ffe-einsatzbericht-code';
     var DATA_KEY = 'ffe-einsatzbericht-daten';
     var MAX_PHOTOS = 8;
@@ -437,11 +456,9 @@
         return '<label class="vehicle"><input type="checkbox" name="fahrzeug" value="' + esc(f) + '">' + esc(f) + '</label>';
       }).join('');
 
-      var andere = d.fahrzeugeAndere || [];
-      $('fahrzeugeAndere').innerHTML = andere.map(function (f) {
-        return '<label class="vehicle"><input type="checkbox" name="fahrzeugAndere" value="' + esc(f) + '">' + esc(f) + '</label>';
-      }).join('');
-      $('fahrzeugeAndereHelp').textContent = andere.length
+      $('fahrzeugAndereSelect').innerHTML = optionsHtml(d.fahrzeugeAndere || [], 'Fahrzeug wählen…');
+      $('fahrzeugAndereAdd').disabled = !(d.fahrzeugeAndere || []).length;
+      $('fahrzeugeAndereHelp').textContent = (d.fahrzeugeAndere || []).length
         ? ''
         : 'Keine Einträge. Im Blatt „Einstellungen“ unter „Fahrzeuge andere Feuerwehren“ ergänzen.';
 
@@ -476,6 +493,8 @@
       addCrewRow();
       state.photos = [];
       renderPhotos();
+      state.fahrzeugeAndere = [];
+      renderFahrzeugeAndere();
       clearErrors();
     }
 
@@ -553,6 +572,30 @@
 
     $('addCrew').addEventListener('click', addCrewRow);
 
+    /* ---------- Fahrzeuge anderer Feuerwehren ---------- */
+    function renderFahrzeugeAndere() {
+      $('fahrzeugeAndereChips').innerHTML = state.fahrzeugeAndere.map(function (f, i) {
+        return '<span class="chip">' + esc(f) +
+          '<button type="button" data-i="' + i + '" title="Entfernen" aria-label="Entfernen"><i class="fas fa-xmark"></i></button></span>';
+      }).join('');
+    }
+
+    $('fahrzeugAndereAdd').addEventListener('click', function () {
+      var sel = $('fahrzeugAndereSelect');
+      var v = sel.value;
+      if (!v || state.fahrzeugeAndere.indexOf(v) !== -1) return;
+      state.fahrzeugeAndere.push(v);
+      renderFahrzeugeAndere();
+      sel.value = '';
+    });
+
+    $('fahrzeugeAndereChips').addEventListener('click', function (ev) {
+      var btn = ev.target.closest('button[data-i]');
+      if (!btn) return;
+      state.fahrzeugeAndere.splice(parseInt(btn.getAttribute('data-i'), 10), 1);
+      renderFahrzeugeAndere();
+    });
+
     /* ---------- Absenden ---------- */
     function collect() {
       var p = {};
@@ -566,8 +609,7 @@
 
       p.fahrzeuge = Array.prototype.map.call(
         document.querySelectorAll('input[name="fahrzeug"]:checked'), function (c) { return c.value; });
-      p.fahrzeugeAndere = Array.prototype.map.call(
-        document.querySelectorAll('input[name="fahrzeugAndere"]:checked'), function (c) { return c.value; });
+      p.fahrzeugeAndere = state.fahrzeugeAndere.slice();
 
       p.mannschaft = Array.prototype.map.call(document.querySelectorAll('.crew-row'), function (row) {
         return {
